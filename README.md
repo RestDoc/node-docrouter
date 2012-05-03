@@ -1,6 +1,6 @@
 # DocRouter #
 A Connect/Express router wrapper which exposes a formatted description of the available services of a server.
-The documentation is available is multiple formats (Html, Wadl, Json).
+The documentation is available is multiple formats (RestDoc Json, Html).
 
 The usage mimics the regular router's behavior.
 
@@ -8,11 +8,10 @@ The usage mimics the regular router's behavior.
 Two options:
 
 - !! (GET http://myservice.mydomain.com/!!)
-- OPTIONS (OPTIONS http://myservice.mydomain.com/)
+- OPTIONS (OPTIONS http://myservice.mydomain.com/*)
 
 ## Supported outputs ##
 - JSON (Accept: application/json) 
-- WADL (Accept: text/xml)
 - HTML (Accept: text/html)
 
 docRouter follows the ___RestDoc___ spec (https://github.com/RestDoc), RestDoc is a live spec so please 

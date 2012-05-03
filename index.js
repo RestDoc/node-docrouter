@@ -1,17 +1,37 @@
-﻿var j2w = require('./json2wadl'),
-    jade = require('jade'),
+﻿var jade = require('jade'),
     fs = require('fs'),
     methods = require('./methods'),
     path = require('path');
 
 var jadeTemplate = fs.readFileSync(path.join(__dirname, 'doc.jade'), 'utf8');
 
+var extendObject = function(target) { // copied from https://github.com/documentcloud/underscore
+     var i = 1, length = arguments.length, source;
+     for ( ; i < length; i++ ) {
+         // Only deal with defined values
+         if ( (source = arguments[i]) != undefined ) {
+             Object.getOwnPropertyNames(source).forEach(function(k){
+                                                            var d = Object.getOwnPropertyDescriptor(source, k) || {value:source[k]};
+                                                            if (d.get) {
+                                                                target.__defineGetter__(k, d.get);
+                                                                if (d.set) target.__defineSetter__(k, d.set);
+                                                            }
+                                                            else if (target !== d.value) {
+                                                                target[k] = d.value;
+                                                            }
+                                                        });
+         }
+     }
+     return target;
+ };
+
+
 var DocRouter = function (connectRouter, baseUrl) {
     if (!connectRouter) throw new Error("Connect router function is missing.");
     if (!baseUrl) throw new Error("A base url is missing.");
 
     this.connectRouter = null;
-    this.methodJsons = [];
+    this.restdoc = { headers: {}, resources : [] };
     this.baseUrl = baseUrl;
     this.wadl = null;
 
@@ -24,14 +44,56 @@ var DocRouter = function (connectRouter, baseUrl) {
         self.connectRouter = connectRouter;
     }
 
+    function getResource(id) {
+        var i;
+        var resources = self.restdoc.resources;
+        
+        for (i=0; i<resources.length; i++) {
+            if (resources[i].id === id) {
+                return resources[i];
+            }
+        }
+
+        return null;
+    }
+
     this.connectRouter.get("/!!", function (req, res) {
-        getWadl(req, res);
+        getDescription(req, res);
     });
 
-
-    this.connectRouter.options("/", function (req, res) {
-        getWadl(req, res);
+    this.connectRouter.options(/\/?[*]/g, function (req, res) {
+        getDescription(req, res);
     });
+
+    this.connectRouter.options("/:resource", function (req, res) {
+        var resource = getResource(req.params.resource) || {};
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(resource));
+    });
+
+    this.connectRouter.setResourceInfo = function(resource) {
+        if (!resource) {
+            throw new Error("resource must be provided");
+        }
+        if (!resource.id) {
+            throw new Error("resource must include an id");
+        }
+
+        var existingResource = getResource(resource.id);
+
+        if (!existingResource) {
+            existingResource = { id: resource.id, methods: {} };
+            self.restdoc.resources.push(existingResource);
+        }
+
+        return extendObject(existingResource, resource);
+    }
+
+    this.connectRouter.setHeadersInfo = function(headers) {
+        headers = headers || {};
+        return extendObject(self.restdoc.headers, headers);
+    }
 
     var method,
         i,
@@ -45,15 +107,30 @@ var DocRouter = function (connectRouter, baseUrl) {
                 var args = arguments;
                 var handlersCount = args.length;
                 // Multiple arguments may exist for multiple middlewares. The Json describing the method is the last argument.
-                methodJson = {};
+                var methodJson = {};
                 if (typeof(args[args.length - 1]) === 'object'){
                     methodJson = args[args.length - 1];
                     handlersCount -= 1;
                 }
-                methodJson.method = method.toUpperCase();
+                method = method.toUpperCase();
                 methodJson.path = route;
 
-                self.methodJsons.push(methodJson);
+                methodJson.description = methodJson.description || methodJson.doc;
+
+                // add backward support for style field (query/template)
+                if (method.params) {
+                    var param;
+                    for (param in method.params) {
+                        if (!param.style) {
+                            param.style = ~route.indexOf('{?' + param + '}') ? "query" : "template";
+                        }
+                    }
+                }
+
+                var id = methodJson.id || methodJson.path;
+                var resource = getResource(id) || { id: id, methods: {} };
+
+                resource.methods[method] = methodJson;
 
                 // call the original router with the original arguments
 
@@ -63,15 +140,8 @@ var DocRouter = function (connectRouter, baseUrl) {
         }(method, self.connectRouter[method]));
     }
 
-    function getWadl(req, res) {
+    function getDescription(req, res) {
         var htmlTemplate;
-        if (req.headers.accept &&
-            (~req.headers.accept.indexOf('application/json') || ~req.headers.accept.indexOf('text/json')))
-        {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(self.methodJsons));
-            return;
-        }
 
         if (req.headers.accept &&
             (~req.headers.accept.indexOf('text/html') || ~req.headers.accept.indexOf('text/plain')))
@@ -80,21 +150,16 @@ var DocRouter = function (connectRouter, baseUrl) {
             if (!self.html) {
                 try {
                     htmlTemplate = jade.compile(jadeTemplate);
-                    self.html = htmlTemplate({methodJsons: self.methodJsons, baseUrl: self.baseUrl});
+                    self.html = htmlTemplate({restdoc: self.restdoc, baseUrl: self.baseUrl});
                 } catch(e) {
                     console.error(e);
                 }
             }
-            res.end(self.html);
-            return;
+            return res.end(self.html);
         }
 
-        if (!self.wadl) {
-            self.wadl = j2w.toWadl(self.methodJsons, self.baseUrl, { pretty: true });
-        }
-
-        res.writeHead(200, { 'Content-Type': 'application/xml' });
-        res.end(self.wadl);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(self.restdoc));
     }
 };
 

@@ -4,54 +4,33 @@ var express = require('express');
 var request = require('request');
 
 function nope(req, res) {
-    res.end();
+    res.end(req.body);
 }
 
 function mapRouter(app) {
+    app.setResourceInfo({
+        id: "App",
+        params: {
+            app: {
+                style: "template",
+                type: "string",
+                required: true
+            }
+        }
+    });
+
     app.get('/:app', nope,
         {
-            id: "GetApp",
-            doc: "Gets the app",
-            params: {
-                app: {
-                    style: "template",
-                    type: "string",
-                    required: true
-                }
-            }
+            id: "App",
+            description: "Gets the app"
         });
+
     app.post('/:app', nope,
         {
-            id: "UpdateApp",
-            doc: "Updates the app",
-            params: {
-                app: {
-                    style: "template",
-                    type: "string",
-                    required: true
-                }
-            }
+            id: "App",
+            doc: "Updates the app"
         });
 }
-
-exports['test get wadl'] = function (test) {
-    var server = connect.createServer(
-        docRouter(connect.router, "boo", mapRouter)
-    );
-    server.listen(5000);
-
-    request('http://localhost:5000/!!', function (error, res) {
-        if (error) {
-            test.fail("Could not get waml");
-            return;
-        }
-
-        test.ok(~res.body.indexOf('<method id="GetApp" name="GET">'));
-        test.ok(~res.body.indexOf('<method id="UpdateApp" name="POST">'));
-        server.close();
-        test.done();
-    });
-};
 
 exports['test get json'] = function (test) {
     var server = connect.createServer(
@@ -60,7 +39,7 @@ exports['test get json'] = function (test) {
     server.listen(5000);
 
     request({
-            uri: 'http://localhost:5000/',
+            uri: 'http://localhost:5000/*',
             method: 'OPTIONS',
             headers: { accept: 'application/json'}
         },
@@ -70,8 +49,8 @@ exports['test get json'] = function (test) {
                 return;
             }
 
-            var methodsJson = JSON.parse(res.body);
-            test.ok(methodsJson.length == 2);
+            var restdoc = JSON.parse(res.body);
+            test.ok(restdoc.resources.length == 1);
             server.close();
             test.done();
         });
@@ -84,7 +63,7 @@ exports['test get html'] = function (test) {
     server.listen(5000);
 
     request({
-            uri: 'http://localhost:5000/',
+            uri: 'http://localhost:5000/*',
             method: 'OPTIONS',
             headers: { accept: 'text/html'}
         },
@@ -103,32 +82,32 @@ exports['test get html'] = function (test) {
 
 
 if (express) {
-    exports['test get wadl with express'] = function (test) {
+    exports['test get restdoc with express'] = function (test) {
         var app = express.createServer();
 
         docRouter(app, "boo");
 
+        app.setResourceInfo({
+            id: "App",
+            params: {
+                app: {
+                    required: true
+                }
+            }
+        })
+
         app.get('/:app', nope,
             {
-                id: "GetApp",
-                doc: "Gets the app",
-                params: {
-                    app: {
-                        style: "template",
-                        type: "string",
-                        required: true
-                    }
-                }
+                id: "App",
+                description: "Gets the app",
             });
 
         app.post('/:app', nope,
             {
-                id: "UpdateApp",
-                doc: "Updates the app",
+                id: "App",
+                description: "Updates the app",
                 params: {
                     app: {
-                        style: "template",
-                        type: "string",
                         required: true
                     }
                 }
@@ -138,12 +117,14 @@ if (express) {
 
         request('http://localhost:5000/!!', function (error, res) {
             if (error) {
-                test.fail("Could not get waml");
+                test.fail("Could not get restdoc");
                 return;
             }
 
-            test.ok(~res.body.indexOf('<method id="GetApp" name="GET">'));
-            test.ok(~res.body.indexOf('<method id="UpdateApp" name="POST">'));
+            var restdoc = JSON.parse(res.body);
+            test.ok(restdoc.resources.length == 1);
+            test.ok(restdoc.resources[0].methods.GET);
+            test.ok(restdoc.resources[0].methods.POST);
             app.close();
             test.done();
         });

@@ -85,15 +85,13 @@ html(lang="en")
     body
         .wrapper
             h1= baseUrl
-            each method in methodJsons
+            each resource in restdoc.resources
                 .methodDescription
-                    label.methodType= method.method
-                    label.methodPath= method.path
-                    .doc= method.doc
-
-                    if method.params
+                    h1= resource.id
+                    .doc= resource.description
+                    if resource.params
                         h2 Parameters
-                        each param, paramName in method.params
+                        each param, paramName in resource.params
                             .param
                                 ul
                                     li
@@ -101,50 +99,75 @@ html(lang="en")
                                             label
                                                 em #{paramName}
                                     li
-                                        if param.doc
-                                            .doc= param.doc
+                                        if param.description 
+                                            .doc= param.description
                                         ul
                                             each val, key in param
-                                                if key != "doc"
+                                                if key != "description" && key != "doc"
                                                     li
                                                         strong #{key}:#{" "}
                                                         em #{val}
-                    if method.request
-                        h2 Request
-                        if method.request.doc
-                            .doc= method.request.doc
-                        if method.request.representations
-                            ul
-                                each val, key in method.request.representations
-                                    li #{val}
-                        each param, paramName in method.request.params
-                            .param
+
+                each method, methodType in resource.methods
+                    .methodDescription
+                        label.methodType= methodType
+                        label.methodPath= method.path
+                        .doc= method.description
+
+                        if method.params
+                            h2 Parameters
+                            each param, paramName in method.params
+                                .param
+                                    ul
+                                        li
+                                            .header
+                                                label
+                                                    em #{paramName}
+                                        li
+                                            if param.description
+                                                .doc= param.description
+                                            ul
+                                                each val, key in param
+                                                    if key != "description" && key != "doc"
+                                                        li
+                                                            strong #{key}:#{" "}
+                                                            em #{val}
+                        if method.request
+                            h2 Request
+                            if method.request.description
+                                .doc= method.request.description
+                            if method.request.representations
                                 ul
-                                    li
-                                        .header
-                                            label
-                                                em #{paramName}
-                                    li
-                                        if param.doc
-                                            .doc= param.doc
-                                        ul
-                                            each val, key in param
-                                                if key != "doc"
-                                                    li
-                                                        strong #{key}:#{" "}
-                                                        em #{val}
-                        if method.request.example
-                            h3 Example
-                            pre.source-code= method.request.example
-                    if method.response
-                        h2 Response
-                        if method.response.doc
-                            .doc= method.response.doc
-                        if method.response.representations
-                            ul
-                                each val, key in method.response.representations
-                                    li #{val}
-                        if method.response.example
-                            h3 Example
-                            pre.source-code= method.response.example
+                                    each val, key in method.request.representations
+                                        li #{val}
+                            each param, paramName in method.request.params
+                                .param
+                                    ul
+                                        li
+                                            .header
+                                                label
+                                                    em #{paramName}
+                                        li
+                                            if param.description
+                                                .doc= param.description
+                                            ul
+                                                each val, key in param
+                                                    if key != "description" && key != "doc"
+                                                        li
+                                                            strong #{key}:#{" "}
+                                                            em #{val}
+                            if method.request.example
+                                h3 Example
+                                pre.source-code= method.request.example
+                        if method.response
+                            h2 Response
+                            if method.response.description
+                                .doc= method.response.description
+                            if method.response.representations
+                                ul
+                                    each val, key in method.response.representations
+                                        li #{val}
+                            if method.response.example
+                                h3 Example
+                                pre.source-code= method.response.example
 
